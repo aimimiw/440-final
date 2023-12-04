@@ -1,0 +1,19 @@
+---
+title: "Model"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(quantreg)
+```
+
+3 regression models. One for the 25, 50, or 75th? Do I also have to do for the top quantiles?
+
+```{r}
+quart_25 <- rq(purchase_amount ~ gender + subscription_status + previous_purchases + shipping_type + discount_applied + promo_code, data = df, tau = 0.75)
+```
+
+```{r}
+round(summary(quart_25)$coef, 2)
+```
