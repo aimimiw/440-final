@@ -110,3 +110,12 @@ na_data_after <- df_energy[na_rows, ]
 ```{r}
 write.csv(df_energy, "cleaned_df.csv", row.names = FALSE)
 ```
+
+```{r}
+df_noNA <- subset(df_energy, !is.na(lon))
+```
+
+```{r}
+map <- get_googlemap(center = c(mean_lon = mean(df_noNA$lon), mean_lat = mean(df_noNA$lat)),
+                     zoom = 6, scale = 2, key = "AIzaSyBgmbaiwWU9BqjQi7aPENZh177UDr_-iFQ")
+```
