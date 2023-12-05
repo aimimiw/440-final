@@ -135,5 +135,53 @@ ggplot(df, aes(x = purchase_amount)) +
 ```
 
 ```{r}
+table(df$subscription_status, df$shipping_type)
+```
 
+```{r}
+table(df$subscription_status, df$discount_applied)
+```
+
+```{r}
+table(df$subscription_status, df$promo_code)
+```
+
+```{r}
+table(df$discount_applied, df$promo_code)
+```
+
+```{r}
+table(df$subscription_status, df$purchase_frequency)
+```
+
+```{r}
+table(df$shipping_type, df$purchase_frequency)
+```
+
+```{r}
+table(df$purchase_frequency, df$gender)
+```
+
+```{r}
+ggplot(df, aes(x = previous_purchases)) + 
+  geom_histogram() + 
+  facet_wrap(.~ subscription_status)
+```
+
+```{r}
+ggplot(df, aes(x = purchase_frequency)) + 
+  geom_bar() + 
+  facet_wrap(.~ gender)
+```
+
+```{r}
+ggplot(df, aes(x = promo_code)) + 
+  geom_bar() + 
+  facet_wrap(.~ subscription_status)
+```
+
+```{r}
+ggplot(df, aes(x = shipping_type)) + 
+  geom_bar() + 
+  facet_wrap(.~ subscription_status)
 ```

@@ -6,14 +6,134 @@ editor: visual
 
 ```{r}
 library(quantreg)
+library(tidyverse)
+library(tidymodels)
+library(lme4)
+library(lattice)
 ```
 
 3 regression models. One for the 25, 50, or 75th? Do I also have to do for the top quantiles?
 
 ```{r}
-quart_25 <- rq(purchase_amount ~ gender + subscription_status + previous_purchases + shipping_type + discount_applied + promo_code, data = df, tau = 0.75)
+df <- df %>%
+  mutate(
+    shipping_grouped = case_when(
+      shipping_type == "Express" ~ "Special Shipping", 
+      shipping_type == "Free Shipping" ~ "Special Shipping", 
+      shipping_type == "2-Day Shipping" ~ "Fast Shipping", 
+      shipping_type == "Next Day Air" ~ "Fast Shipping", 
+      shipping_type == "Standard" ~ "Regular", 
+      shipping_type == "Store Pickup" ~ "Regular"
+    )
+  )
+```
+
+```{r}
+df <- df %>%
+  mutate(
+    shipping_simp = case_when(
+      shipping_type == "Express" ~ "Special Shipping", 
+      shipping_type == "Free Shipping" ~ "Special Shipping", 
+      shipping_type == "2-Day Shipping" ~ "Regular", 
+      shipping_type == "Next Day Air" ~ "Regular", 
+      shipping_type == "Standard" ~ "Regular", 
+      shipping_type == "Store Pickup" ~ "Regular"
+    )
+  )
+```
+
+```{r}
+purchase_med <- median(df$purchase_amount)
+
+df$customer_cat <- cut(df$purchase_amount, breaks = c(-Inf, purchase_med, Inf), labels = c('low_spender', 'big_spender'))
+```
+
+```{r}
+big_df <- subset(df, customer_cat == "big_spender")
+small_df <- subset(df, customer_cat == "low_spender")
+```
+
+can't combine subscription status with promo code, shipping type, purchase frequency,
+
+```{r}
+quart <- rq(purchase_amount ~ I(shipping_type != "Free Shipping") + promo_code, data = df, tau = 0.75)
+```
+
+```{r}
+quart_25 <- rq(purchase_amount ~ shipping_simp + promo_code, data = df, tau = 0.75)
 ```
 
 ```{r}
 round(summary(quart_25)$coef, 2)
+```
+
+```{r}
+overall_big <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(purchase_amount ~ shipping_grouped + subscription_status + promo_code + previous_purchases, data = big_df)
+
+tidy(overall_big)
+```
+
+```{r}
+overall_low <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(purchase_amount ~ shipping_grouped + subscription_status + promo_code + previous_purchases, data = small_df)
+
+tidy(overall_low)
+```
+
+```{r}
+overall_aug_big <- augment(overall_big$fit)
+```
+
+```{r}
+ggplot(data = overall_aug_big, aes(x = .fitted, y = .resid)) + 
+  geom_point() + 
+  geom_line(y = 0, color = "blue")
+```
+
+```{r}
+overall_aug_small <- augment(overall_low$fit)
+ggplot(data = overall_aug_small, aes(x = .fitted, y = .resid)) + 
+  geom_point() + 
+  geom_line(y = 0, color = "blue")
+```
+
+```{r}
+ggplot(data = small_df, aes(x = purchase_amount)) + 
+  geom_histogram(binwidth = 1)
+```
+
+```{r}
+mixed_model = lmer(purchase_amount ~ shipping_grouped + subscription_status + promo_code + previous_purchases + (1|location), data = df)
+summary(mixed_model)
+```
+
+```{r}
+mixed_model_big = lmer(purchase_amount ~ shipping_grouped + subscription_status + promo_code + previous_purchases + (1|location), data = big_df)
+```
+
+```{r}
+summary(mixed_model_big)
+```
+
+```{r}
+mixed_model_small = lmer(purchase_amount ~ shipping_grouped + subscription_status + promo_code + previous_purchases + (1|location), data = small_df)
+
+summary(mixed_model_small)
+```
+
+boundary (singular) fit: see help('isSingular')
+
+```{r}
+linearity = plot( big_df$purchase_amount, resid(mixed_model_big))
+
+qqmath(mixed_model_big)
+```
+
+```{r}
+linearity = plot(small_df$purchase_amount, resid(mixed_model_small))
+
+qqmath(mixed_model_small)
 ```

@@ -1,0 +1,112 @@
+---
+title: "Energy"
+format: pdf
+editor: visual
+---
+
+```{r}
+# load in libraries
+package_list <- c("tidyverse", "vroom", "stringr", "dplyr", "ggsci", "gridExtra", "cowplot", "ggplot2", "ggmap")
+
+# load in packages
+for (package_name in package_list) {
+  if (!requireNamespace(package_name, quietly = TRUE)) {
+    install.packages(package_name)
+  }
+  library(package_name, character.only = TRUE)
+}
+
+# load in data
+df_energy <- vroom("before_after_energy.csv")
+```
+
+```{r , include = FALSE}
+na_rows <- which(is.na(df_energy$lat))
+na_data <- df_energy[na_rows, ]
+
+```
+
+```{r ,include = FALSE}
+offshore <- df_energy[df_energy$technology == "Offshore", ]
+```
+
+```{r}
+na_rows <- which(is.na(offshore$lat))
+na_offshore <- offshore[na_rows, ]
+```
+
+```{r}
+min_lat_eez <- 52.8711
+max_lat_eez <- 55.9193
+
+min_long_eez <- 3.35
+max_long_eez <- 14.75
+
+min_lat_12 <- 54.5685
+max_lat_12 <- 55.0988
+
+min_long_12 <- 6.3495
+max_long_12 <- 14.3164
+```
+
+```{r}
+offshore_wind_eez <- df_energy$technology == "Offshore" & df_energy$municipality == "Ausschließliche Wirtschaftszone"
+```
+
+```{r}
+df_energy$lat[offshore_wind_eez & is.na(df_energy$lat)] <- runif(sum(offshore_wind_eez), min_lat_eez, max_lat_eez)
+
+df_energy$lon[offshore_wind_eez & is.na(df_energy$lon)] <- runif(sum(offshore_wind_eez), min_long_eez, max_long_eez)
+```
+
+```{r}
+offshore_wind_12 <- df_energy$technology == "Offshore" & df_energy$municipality == "Küstenmeer (12-Seemeilen-Zone)"
+```
+
+```{r}
+df_energy$lat[offshore_wind_12 & is.na(df_energy$lat)] <- runif(sum(offshore_wind_12), min_lat_12, max_lat_12)
+
+df_energy$lon[offshore_wind_12 & is.na(df_energy$lon)] <- runif(sum(offshore_wind_12), min_long_12, max_long_12)
+```
+
+```{r}
+na_rows <- which(is.na(df_energy$lat))
+na_data <- df_energy[na_rows, ]
+na_data_before <- na_data
+```
+
+```{r}
+register_google(key = "AIzaSyBhDnc2FAyme3S6uZj75o53comen8lszG0")
+```
+
+```{r}
+#thanks to chatgpt with help for the below code
+
+df_energy$postcode <- as.character(df_energy$postcode)
+
+for (i in seq_along(df_energy$lat)) {
+  if (is.na(df_energy$lat[i]) || is.na(df_energy$lon[i])){
+    
+    geo_data <- geocode(df_energy$postcode[i], output = "latlon", source = "google", country = "Germany")
+    
+    if(!is.na(geo_data$lat) && !is.na(geo_data$lon)){
+      df_energy$lat[i] <- geo_data$lat
+      df_energy$lon[i] <- geo_data$lon
+      
+    } else{
+      df_energy$lat[i] <- NA
+      df_energy$lon[i] <- NA
+    }
+    
+  }
+}
+```
+
+```{r}
+na_rows <- which(is.na(df_energy$lat))
+na_data_after <- df_energy[na_rows, ]
+```
+
+```{r}
+write.csv(df_energy, "cleaned_df.csv", row.names = FALSE)
+```
