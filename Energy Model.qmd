@@ -1,0 +1,86 @@
+---
+title: "Energy Model"
+format: pdf
+editor: visual
+---
+
+```{r}
+df_energy = read.csv("cleaned_df.csv")
+```
+
+```{r}
+df <- subset(df_energy, !is.na(lat))
+```
+
+```{r}
+library(ape)
+```
+
+```{r}
+dists <- as.matrix(dist(cbind(df$lon, df$lat))) + 0.01
+dists <- 1/dists
+diag(dists) <- 0
+
+Moran.I(df$electrical_capacity, dists, na.rm = TRUE)
+```
+
+```{r}
+library(spgwr)
+```
+
+```{r}
+spdf <- SpatialPointsDataFrame(
+  coords = as.data.frame(st_drop_geometry(df[,c("lon", "lat")])), 
+  data = as.data.frame(st_drop_geometry(df)), 
+  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+)
+```
+
+```{r}
+band <- gwr.sel(electrical_capacity ~ tso, data = spdf, gweight = gwr.Gauss, verbose = TRUE)
+```
+
+```{r}
+summary(df$electrical_capacity)
+```
+
+```{r}
+summary(df$tso)
+```
+
+```{r}
+df_none <- subset(df, !is.na(electrical_capacity))
+```
+
+```{r}
+df_none <- subset(df, !is.na(tso))
+```
+
+```{r}
+spdf_1 <- SpatialPointsDataFrame(
+  coords = as.data.frame(st_drop_geometry(df_none[,c("lon", "lat")])), 
+  data = as.data.frame(st_drop_geometry(df_none)), 
+  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+)
+```
+
+```{r}
+df_partial <- df_none %>%
+  head(10)
+```
+
+```{r}
+spdf_1 <- SpatialPointsDataFrame(
+  coords = as.data.frame(st_drop_geometry(df_partial[,c("lon", "lat")])), 
+  data = as.data.frame(st_drop_geometry(df_partial)), 
+  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+)
+```
+
+```{r}
+band <- gwr.sel(electrical_capacity ~ tso, data = spdf_1, gweight = gwr.Gauss, verbose = TRUE)
+```
+
+```{r}
+m1
+```

@@ -1,0 +1,103 @@
+---
+title: "Data Visualizations"
+format: pdf
+editor: visual
+---
+
+```{r}
+# load in libraries
+package_list <- c("tidyverse", "vroom", "stringr", "dplyr", "ggsci", "gridExtra", "cowplot", "ggplot2", "ggmap", "sf")
+
+# load in packages
+for (package_name in package_list) {
+  if (!requireNamespace(package_name, quietly = TRUE)) {
+    install.packages(package_name)
+  }
+  library(package_name, character.only = TRUE)
+}
+
+
+df = read.csv("cleaned_df_1.csv")
+```
+
+```{r}
+df_before <- df %>%
+  filter(after_2017 == 0)
+
+df_after <- df %>%
+  filter(after_2017 == 1)
+```
+
+
+```{r}
+df_avg_capacity <- df %>%
+  group_by(federal_state, after_2017) %>%
+  summarise(avg_cap = mean(electrical_capacity, na.rm = TRUE))
+```
+
+```{r}
+library(rnaturalearth)
+library(rnaturalearthhires)
+library(maps)
+```
+
+```{r}
+map_germany <- ne_countries(country = "Germany", returnclass = "sf")
+germany_states <- ne_states(country = "Germany", returnclass = "sf")
+```
+
+```{r}
+germany_state_data <- left_join(germany_states, df_avg_capacity, by = c("name" = "federal_state"))
+```
+
+
+```{r}
+offshore_plants <- df %>%
+  filter(technology == "Offshore")
+```
+
+
+```{r}
+avg_capacity_ocean <- mean(offshore_plants$electrical_capacity, na.rm = TRUE)
+```
+
+```{r}
+ocean_polygon <- st_sf(
+  geometry = st_sfc(
+    st_polygon(list(cbind(c(5.5, 14.75, 14.75, 5.5, 5.5), c(52.8711, 52.8711, 55.9193, 55.9193, 52.8711))))
+  ),
+  avg_cap = avg_capacity_ocean
+) %>%
+  st_set_crs(4326)
+```
+
+```{r}
+germany_state_data$after_2017 <- factor(germany_state_data$after_2017, levels = c(0, 1), labels = c("Before 2017 Policy Change", "After 2017 Policy Change"))
+```
+
+
+```{r}
+avg <- ggplot() + 
+  geom_sf(data = germany_state_data, aes(fill = avg_cap)) + 
+  scale_fill_viridis_c() + 
+  labs(fill = "Avg. Capacity (MWh)") + theme_minimal() + 
+  labs(
+    title = "Avg. Capacity of Commissioned Renewable Energy Plants",
+    subtitle = "From 1/1/2016 to 1/1/2018"
+  ) + 
+  theme(
+    text = element_text(size = 6),
+      plot.title = element_text(size = 8)
+  )  + 
+  facet_wrap(~after_2017)
+
+#  geom_sf(data = ocean_polygon, aes(fill = avg_cap), color = NA) +
+avg
+  
+```
+
+```{r}
+ggsave("avg.png", plot = avg)
+```
+
+

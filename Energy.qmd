@@ -6,7 +6,7 @@ editor: visual
 
 ```{r}
 # load in libraries
-package_list <- c("tidyverse", "vroom", "stringr", "dplyr", "ggsci", "gridExtra", "cowplot", "ggplot2", "ggmap")
+package_list <- c("tidyverse", "vroom", "stringr", "dplyr", "ggsci", "gridExtra", "cowplot", "ggplot2", "ggmap", "sf")
 
 # load in packages
 for (package_name in package_list) {
@@ -15,107 +15,146 @@ for (package_name in package_list) {
   }
   library(package_name, character.only = TRUE)
 }
-
-# load in data
-df_energy <- vroom("before_after_energy.csv")
-```
-
-```{r , include = FALSE}
-na_rows <- which(is.na(df_energy$lat))
-na_data <- df_energy[na_rows, ]
-
-```
-
-```{r ,include = FALSE}
-offshore <- df_energy[df_energy$technology == "Offshore", ]
 ```
 
 ```{r}
-na_rows <- which(is.na(offshore$lat))
-na_offshore <- offshore[na_rows, ]
+df = read.csv("cleaned_df_1.csv")
 ```
 
 ```{r}
-min_lat_eez <- 52.8711
-max_lat_eez <- 55.9193
-
-min_long_eez <- 3.35
-max_long_eez <- 14.75
-
-min_lat_12 <- 54.5685
-max_lat_12 <- 55.0988
-
-min_long_12 <- 6.3495
-max_long_12 <- 14.3164
+register_stadiamaps("909cd753-30f3-4edd-b91a-0582451bd74f", write = TRUE)
 ```
 
 ```{r}
-offshore_wind_eez <- df_energy$technology == "Offshore" & df_energy$municipality == "Ausschließliche Wirtschaftszone"
+bbox <- c(left = 4, bottom = 47.27, right = 15.5, top = 56)
+germany_map <- get_stadiamap(bbox, zoom = 6, maptype = "stamen_toner_lite")
 ```
 
 ```{r}
-df_energy$lat[offshore_wind_eez & is.na(df_energy$lat)] <- runif(sum(offshore_wind_eez), min_lat_eez, max_lat_eez)
+df_wind<- subset(df, energy_source_level_2 == "Wind")
+df_solar<- subset(df, energy_source_level_2 == "Solar")
 
-df_energy$lon[offshore_wind_eez & is.na(df_energy$lon)] <- runif(sum(offshore_wind_eez), min_long_eez, max_long_eez)
 ```
 
 ```{r}
-offshore_wind_12 <- df_energy$technology == "Offshore" & df_energy$municipality == "Küstenmeer (12-Seemeilen-Zone)"
+ggmap(germany_map) + 
+  geom_point(data = df, 
+             aes(x = lon, y = lat, 
+                 color = electrical_capacity), size = 0.5, alpha = 0.1) +
+  facet_wrap(~ after_2017)
 ```
 
 ```{r}
-df_energy$lat[offshore_wind_12 & is.na(df_energy$lat)] <- runif(sum(offshore_wind_12), min_lat_12, max_lat_12)
-
-df_energy$lon[offshore_wind_12 & is.na(df_energy$lon)] <- runif(sum(offshore_wind_12), min_long_12, max_long_12)
+df_avg_capacity <- df %>%
+  group_by(federal_state, after_2017) %>%
+  summarise(avg_cap = mean(electrical_capacity, na.rm = TRUE))
 ```
 
 ```{r}
-na_rows <- which(is.na(df_energy$lat))
-na_data <- df_energy[na_rows, ]
-na_data_before <- na_data
+average_df <- merge(df, df_avg_capacity, by = c("federal_state"))
 ```
 
 ```{r}
-register_google(key = "AIzaSyBhDnc2FAyme3S6uZj75o53comen8lszG0")
+#library(maps)
+library(raster)
 ```
 
 ```{r}
-#thanks to chatgpt with help for the below code
-
-df_energy$postcode <- as.character(df_energy$postcode)
-
-for (i in seq_along(df_energy$lat)) {
-  if (is.na(df_energy$lat[i]) || is.na(df_energy$lon[i])){
-    
-    geo_data <- geocode(df_energy$postcode[i], output = "latlon", source = "google", country = "Germany")
-    
-    if(!is.na(geo_data$lat) && !is.na(geo_data$lon)){
-      df_energy$lat[i] <- geo_data$lat
-      df_energy$lon[i] <- geo_data$lon
-      
-    } else{
-      df_energy$lat[i] <- NA
-      df_energy$lon[i] <- NA
-    }
-    
-  }
-}
+#germany_borders <- map_data("world", region = "Germany")
 ```
 
 ```{r}
-na_rows <- which(is.na(df_energy$lat))
-na_data_after <- df_energy[na_rows, ]
+state_borders <- getData(country = "Germany", level = 1)
 ```
 
 ```{r}
-write.csv(df_energy, "cleaned_df.csv", row.names = FALSE)
+ggmap(germany_map)
 ```
 
 ```{r}
-df_noNA <- subset(df_energy, !is.na(lon))
+ggmap(germany_map) +
+  geom_polygon(data = average_df, 
+               aes(x = lon, y = lat, 
+                   group = federal_state, 
+                   fill = avg_cap))  + 
+  geom_polygon(data = state_borders, 
+               aes(x = long, y = lat, group = group), 
+               fill = NA, color = "black", size = 0.2) + 
+  facet_wrap(~after_2017)
+  #geom_path(data = germany_borders, aes(x = long, y = lat, group = group), size = 0.2)
 ```
 
 ```{r}
-map <- get_googlemap(center = c(mean_lon = mean(df_noNA$lon), mean_lat = mean(df_noNA$lat)),
-                     zoom = 6, scale = 2, key = "AIzaSyBgmbaiwWU9BqjQi7aPENZh177UDr_-iFQ")
+library(rnaturalearth)
+library(rnaturalearthhires)
+library(maps)
 ```
+
+```{r}
+map_germany <- ne_countries(country = "Germany", returnclass = "sf")
+germany_states <- ne_states(country = "Germany", returnclass = "sf")
+```
+
+```{r}
+germany_state_data <- left_join(germany_states, df_avg_capacity, by = c("name" = "federal_state"))
+```
+
+```{r}
+offshore_plants <- df %>%
+  filter(technology == "Offshore")
+
+offshore_points <- st_as_sf(offshore_plants, coords = c("lon", "lat"), crs = 4326)
+
+avg_offshore <- offshore_points %>%
+  summarise(avg_capacity_offshore = mean(electrical_capacity, na.rm = TRUE))
+```
+
+```{r}
+prep_offshore <- st_set_geometry(avg_offshore, NULL) %>%
+  rename(avg_cap = avg_capacity_offshore)
+```
+
+```{r}
+combined_offshore <- germany_state_data %>%
+  bind_rows(prep_offshore)
+```
+
+
+
+```{r}
+avg_capacity_ocean <- mean(prep_offshore$avg_cap, na.rm = TRUE)
+```
+
+
+```{r}
+ocean_polygon <- st_sf(
+  geometry = st_sfc(
+    st_polygon(list(cbind(c(5.5, 14.75, 14.75, 5.5, 5.5), c(52.8711, 52.8711, 55.9193, 55.9193, 52.8711))))
+  ),
+  avg_cap = avg_capacity_ocean
+) %>%
+  st_set_crs(4326)
+```
+
+
+```{r}
+ggplot() + 
+  geom_sf(data = germany_state_data, aes(fill = avg_cap)) + 
+  scale_fill_viridis_c() + 
+  labs(fill = "Avg. Capacity (MWh)") + theme_minimal() + 
+  labs(
+    title = "Avg. Capacity of Renewable Energy Plants",
+    subtitle = "Data from 2016 to 2018"
+  ) + 
+  theme(
+    text = element_text(size = 8),
+      plot.title = element_text(size = 10)
+  ) + 
+  facet_wrap(~ after_2017)
+
+
+#geom_sf(data = ocean_polygon, aes(fill = avg_cap), color = NA) +
+```
+
+
+
