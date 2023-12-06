@@ -28,6 +28,7 @@ df_after <- df %>%
   filter(after_2017 == 1)
 ```
 
+### Average Plots
 
 ```{r}
 df_avg_capacity <- df %>%
@@ -50,12 +51,10 @@ germany_states <- ne_states(country = "Germany", returnclass = "sf")
 germany_state_data <- left_join(germany_states, df_avg_capacity, by = c("name" = "federal_state"))
 ```
 
-
 ```{r}
 offshore_plants <- df %>%
   filter(technology == "Offshore")
 ```
-
 
 ```{r}
 avg_capacity_ocean <- mean(offshore_plants$electrical_capacity, na.rm = TRUE)
@@ -74,7 +73,6 @@ ocean_polygon <- st_sf(
 ```{r}
 germany_state_data$after_2017 <- factor(germany_state_data$after_2017, levels = c(0, 1), labels = c("Before 2017 Policy Change", "After 2017 Policy Change"))
 ```
-
 
 ```{r}
 avg <- ggplot() + 
@@ -100,4 +98,83 @@ avg
 ggsave("avg.png", plot = avg)
 ```
 
+### Sum Plots
 
+```{r}
+df_sum_capacity <- df %>%
+  group_by(federal_state, after_2017) %>%
+  summarise(sum_cap = sum(electrical_capacity, na.rm = TRUE))
+
+```
+
+```{r}
+germany_state_data_sum <- left_join(germany_states, df_sum_capacity, by = c("name" = "federal_state"))
+```
+
+```{r}
+offshore_plants <- df %>%
+  filter(technology == "Offshore")
+```
+
+```{r}
+sum_capacity_ocean <- sum(offshore_plants$electrical_capacity, na.rm = TRUE)
+```
+
+```{r}
+ocean_polygon <- st_sf(
+  geometry = st_sfc(
+    st_polygon(list(cbind(c(5.5, 14.75, 14.75, 5.5, 5.5), c(52.8711, 52.8711, 55.9193, 55.9193, 52.8711))))
+  ),
+  sum_cap = sum_capacity_ocean
+) %>%
+  st_set_crs(4326)
+```
+
+```{r}
+germany_state_data_sum$after_2017 <- factor(germany_state_data_sum$after_2017, levels = c(0, 1), labels = c("Before 2017 Policy Change", "After 2017 Policy Change"))
+```
+
+```{r}
+sum <- ggplot() + 
+  geom_sf(data = ocean_polygon, aes(fill = sum_cap), color = NA) +
+  geom_sf(data = germany_state_data_sum, aes(fill = sum_cap)) + 
+  scale_fill_viridis_c() + 
+  labs(fill = "Avg. Capacity (MWh)") + theme_minimal() + 
+  labs(
+    title = "Avg. Capacity of Commissioned Renewable Energy Plants",
+    subtitle = "From 1/1/2016 to 1/1/2018"
+  ) + 
+  theme(
+    text = element_text(size = 6),
+      plot.title = element_text(size = 8)
+  )  + 
+  facet_wrap(~after_2017)
+
+ 
+sum
+  
+```
+
+```{r}
+sum <- ggplot() + 
+  geom_sf(data = germany_state_data_sum, aes(fill = sum_cap)) + 
+  scale_fill_viridis_c() + 
+  labs(fill = "Total Capacity (MWh)") + theme_minimal() + 
+  labs(
+    title = "Total Capacity of Commissioned Renewable Energy Plants",
+    subtitle = "From 1/1/2016 to 1/1/2018"
+  ) + 
+  theme(
+    text = element_text(size = 6),
+      plot.title = element_text(size = 8)
+  )  + 
+  facet_wrap(~after_2017)
+
+
+#geom_sf(data = ocean_polygon, aes(fill = sum_cap), color = NA) + 
+sum
+```
+
+```{r}
+ggsave("sum.png", plot = sum)
+```
