@@ -178,3 +178,222 @@ sum
 ```{r}
 ggsave("sum.png", plot = sum)
 ```
+
+### Histogram Plot
+
+```{r}
+df$commissioning_date <- ymd(df$commissioning_date)
+
+hist_power <- ggplot(df, aes(x = commissioning_date)) + 
+  geom_histogram(fill = "darkslategray2", binwidth = 30) + 
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 5500, label = "Policy Change", vjust = 1, hjust = 0) + 
+  labs(
+      title = "Distribution of Renewable Power", 
+      subtitle = "Commissioned 2016-2018", 
+      x = "Commissioning Date", 
+      y = "Count"
+    ) + 
+  scale_x_date(date_labels = "%b %Y", date_breaks= "6 months") 
+ 
+hist_power   
+```
+
+```{r}
+ggsave("hist_power.png", plot = hist_power)
+```
+
+### Boxplot Electrical Capacities
+
+```{r}
+ggplot(df, aes(x = factor(after_2017), y = electrical_capacity, fill = energy_source_level_2)) + 
+  geom_boxplot() + 
+  facet_wrap(~energy_source_level_2)
+```
+
+### Total Capacity Line Graph
+
+```{r}
+sum_energy <- df %>%
+  group_by(commissioning_date, energy_source_level_2) %>%
+  summarise(total_capacity = sum(electrical_capacity))
+```
+
+```{r}
+cumsum_energy <- df %>%
+  group_by(energy_source_level_2) %>%
+  arrange(commissioning_date) %>%
+  mutate(cum_capacity = cumsum(electrical_capacity))
+```
+
+
+
+```{r}
+cumsum_energy$commissioning_date <- ymd(cumsum_energy$commissioning_date)
+
+total_capacity_type <- ggplot(cumsum_energy, 
+       aes(x = commissioning_date, y = cum_capacity, color = as.factor(energy_source_level_2))) +
+  geom_line() +
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 7500, label = "Policy Change", vjust = 1, hjust = 1) + 
+  labs(title = "Cumulative Capacity", 
+       subtitle = "From 1/1/2016 to 1/1/2018", 
+       color = "Renewable Energy Source", 
+       x = "Commissioning Date", 
+       y = "Cumulative Capacity (MWh)"
+       )
+
+
+total_capacity_type
+
+```
+
+
+
+
+```{r}
+ggsave("total_capacity_type.png", plot = total_capacity_type)
+```
+```{r}
+
+total_capacity <- ggplot(sum_energy, 
+       aes(x = commissioning_date, y = cumsum(total_capacity))) + 
+  geom_line() + 
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 10000, label = "Policy Change", vjust = 1, hjust = 1) + 
+  labs(title = "Cumulative Capacity Overall", 
+       subtitle = "From 1/1/2016 to 1/1/2018", 
+       x = "Commissioning Date", 
+       y = "Cumulative Capacity (MWh)")
+
+total_capacity
+```
+
+```{r}
+ggsave("total_capacity.png", plot = total_capacity)
+```
+
+
+### Renewables on Maps
+
+```{r}
+bbox <- c(left = 4, bottom = 47.27, right = 15.5, top = 56)
+germany_map <- get_stadiamap(bbox, zoom = 6, maptype = "stamen_toner_lite")
+```
+
+```{r}
+df$after_2017 <- factor(df$after_2017, levels = c(0, 1), labels = c("Before 2017 Policy Change", "After 2017 Policy Change"))
+```
+
+
+```{r}
+df_wind<- subset(df, energy_source_level_2 == "Wind")
+df_solar<- subset(df, energy_source_level_2 == "Solar")
+df_hydro<- subset(df, energy_source_level_2 == "Hydro")
+df_geo<- subset(df, energy_source_level_2 == "Geothermal")
+df_bio<- subset(df, energy_source_level_2 == "Bioenergy")
+```
+
+```{r}
+
+wind <- ggmap(germany_map) + 
+geom_point(data = df_wind, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), alpha = 0.15) +
+facet_wrap(~after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Wind Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+wind
+
+ggsave("wind.png", plot = wind)
+  
+```
+
+```{r}
+df_solar_not_small <- df_solar %>%
+  filter(size != "small")
+
+df_solar_small <- df_solar %>%
+  filter(size == "small")
+#only want utility-sized solar farms
+```
+
+
+```{r}
+solar <- ggmap(germany_map) + 
+geom_point(data = df_solar, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), size = 0.5, alpha = 0.15) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Solar Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+solar
+
+ggsave("solar.png", plot = solar)
+```
+
+```{r}
+solar_not_small <- ggmap(germany_map) + 
+geom_point(data = df_solar_not_small, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), alpha = 0.15) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Solar Power Plants with >1MWh Capacity", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+solar_not_small
+
+ggsave("solar_not_small.png", plot = solar_not_small)
+```
+
+
+```{r}
+hydro <- ggmap(germany_map) + 
+geom_point(data = df_hydro, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), alpha = 0.15) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Hydro Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+hydro
+ggsave("hydro.png", plot = hydro)
+
+```
+
+```{r}
+bioenergy <- ggmap(germany_map) + 
+geom_point(data = df_bio, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), size = 0.5, alpha = 0.1) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+    labs(title = "Commissioned Bioenergy Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+bioenergy
+ggsave("bioenergy.png", plot = bioenergy)
+
+```
+

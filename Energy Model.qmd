@@ -5,82 +5,126 @@ editor: visual
 ---
 
 ```{r}
-df_energy = read.csv("cleaned_df.csv")
+head(df)
+```
+
+
+```{r}
+library(lme4)
+library(tidyverse)
+library(tidymodels)
+library(MuMIn)
+library(lattice)
+```
+
+
+```{r}
+mixed_model = lmer(electrical_capacity ~ energy_source_level_2 + after_2017 +  size + voltage_level + (1|federal_state), data = df)
 ```
 
 ```{r}
-df <- subset(df_energy, !is.na(lat))
+mixed_model
+```
+```{r}
+r.squaredGLMM(mixed_model)
+```
+```{r}
+qqmath(mixed_model)
+```
+
+
+```{r}
+
+
+plot(fitted(mixed_model), residuals(mixed_model))
+```
+
+
+```{r}
+regular_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size + voltage_level, data = df)
+
+tidy(regular_model)
+```
+```{r}
+glance(regular_model)$r.squared
+```
+```{r}
+regular_aug <- augment(regular_model$fit)
+
+ggplot(data = regular_aug, aes(x = .fitted, y = .resid)) + 
+  geom_point() + 
+  geom_line(y = 0, color = "blue")
+```
+Create another variable with small, big, and large
+
+non-constant variance 
+
+
+
+```{r}
+df <- df %>%
+  mutate(
+    size = case_when(
+      electrical_capacity <= 1 ~ "small", 
+      electrical_capacity > 1 & electrical_capacity <= 4 ~ "medium", 
+      electrical_capacity > 4 ~ "big", 
+      TRUE ~ NA_character_
+    )
+  )
+
 ```
 
 ```{r}
-library(ape)
+df_sum_capacity <- df %>%
+  group_by(federal_state, after_2017, energy_source_level_2, size) %>%
+  summarise(sum_cap = sum(electrical_capacity, na.rm = TRUE))
 ```
 
 ```{r}
-dists <- as.matrix(dist(cbind(df$lon, df$lat))) + 0.01
-dists <- 1/dists
-diag(dists) <- 0
-
-Moran.I(df$electrical_capacity, dists, na.rm = TRUE)
+regular_model_state <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state, data = df)
 ```
 
 ```{r}
-library(spgwr)
+tidy(regular_model_state)
+```
+
+
+```{r}
+glance(regular_model_state)$r.squared
+```
+```{r}
+df_big <- df %>%
+  filter(size == "big")
 ```
 
 ```{r}
-spdf <- SpatialPointsDataFrame(
-  coords = as.data.frame(st_drop_geometry(df[,c("lon", "lat")])), 
-  data = as.data.frame(st_drop_geometry(df)), 
-  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
-)
+df_small <- df %>%
+  filter(size == "small")
+```
+
+
+```{r}
+regular_model_big <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state, data = df_big)
 ```
 
 ```{r}
-band <- gwr.sel(electrical_capacity ~ tso, data = spdf, gweight = gwr.Gauss, verbose = TRUE)
+tidy(regular_model_big)
 ```
 
 ```{r}
-summary(df$electrical_capacity)
+regular_model_small <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state, data = df_small)
 ```
 
 ```{r}
-summary(df$tso)
+tidy(regular_model_small)
 ```
 
-```{r}
-df_none <- subset(df, !is.na(electrical_capacity))
-```
 
-```{r}
-df_none <- subset(df, !is.na(tso))
-```
-
-```{r}
-spdf_1 <- SpatialPointsDataFrame(
-  coords = as.data.frame(st_drop_geometry(df_none[,c("lon", "lat")])), 
-  data = as.data.frame(st_drop_geometry(df_none)), 
-  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
-)
-```
-
-```{r}
-df_partial <- df_none %>%
-  head(10)
-```
-
-```{r}
-spdf_1 <- SpatialPointsDataFrame(
-  coords = as.data.frame(st_drop_geometry(df_partial[,c("lon", "lat")])), 
-  data = as.data.frame(st_drop_geometry(df_partial)), 
-  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
-)
-```
-
-```{r}
-band <- gwr.sel(electrical_capacity ~ tso, data = spdf_1, gweight = gwr.Gauss, verbose = TRUE)
-```
-
-```{r}
-m1
-```
