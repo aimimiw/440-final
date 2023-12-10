@@ -129,5 +129,21 @@ df_clean <- df_none %>%
 ```
 
 ```{r}
+df_clean <- df_clean %>%
+  mutate(
+    size = case_when(
+      electrical_capacity <= 1 ~ "small", 
+      electrical_capacity > 1 & electrical_capacity <= 4 ~ "medium", 
+      electrical_capacity > 4 ~ "big", 
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+```{r}
+df_clean$after_2017 <- factor(df_clean$after_2017, levels = c(0, 1), labels = c("Before 2017 Policy Change", "After 2017 Policy Change"))
+```
+
+```{r}
 write.csv(df_clean, "cleaned_df_1.csv", row.names = FALSE)
 ```

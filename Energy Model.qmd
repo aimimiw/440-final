@@ -4,6 +4,132 @@ format: pdf
 editor: visual
 ---
 
+
+## Linear Model
+
+Plan: 
+An overall linear model and then one just for solar and wind, along with their confidence intervals. 
+
+```{r}
+regular_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size + voltage_level, data = df)
+
+saveRDS(regular_model, file = "regular_model.rds")
+```
+
+
+```{r}
+regular_model_solar <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ after_2017 + federal_state + size, data = df_solar)
+
+saveRDS(regular_model_solar, file = "regular_model_solar.rds")
+```
+
+
+```{r}
+regular_model_wind <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ after_2017 + federal_state + size, data = df_wind)
+
+saveRDS(regular_model_wind, file = "regular_model_wind.rds")
+```
+
+
+## Linear Mixed Model
+
+
+
+### Overall
+
+```{r}
+library(lme4)
+library(tidyverse)
+library(tidymodels)
+library(MuMIn)
+library(lattice)
+library(emmeans)
+
+```
+
+```{r}
+mixed_model = lmer(electrical_capacity ~ energy_source_level_2 + after_2017 + size + (1|federal_state), data = df)
+```
+
+```{r}
+mixed_model
+```
+
+```{r}
+# Get the 95% confidence intervals for the coefficients
+conf_int <- confint(mixed_model, parm = "after_2017After 2017 Policy Change", level = 0.95)
+
+# Print the confidence intervals
+print(conf_int)
+```
+
+```{r}
+r.squaredGLMM(mixed_model)
+```
+
+
+
+```{r}
+saveRDS(mixed_model, file = "mixed_model.rds")
+```
+
+
+### Solar Only
+
+```{r}
+mixed_model_solar = lmer(electrical_capacity ~ after_2017 + size + (1|federal_state), data = df_solar)
+```
+
+```{r}
+mixed_model_solar
+```
+
+```{r}
+# Get the 95% confidence intervals for the coefficients
+conf_int_solar <- confint(mixed_model_solar, parm = "after_2017After 2017 Policy Change", level = 0.95)
+
+# Print the confidence intervals
+print(conf_int_solar)
+```
+
+```{r}
+saveRDS(mixed_model_solar, file = "mixed_model_solar.rds")
+```
+
+
+
+### Wind
+
+
+```{r}
+mixed_model_wind = lmer(electrical_capacity ~ after_2017 + size + (1|federal_state), data = df_wind)
+```
+
+```{r}
+mixed_model_wind
+```
+
+
+```{r}
+# Get the 95% confidence intervals for the coefficients
+conf_int_wind <- confint(mixed_model_wind, parm = "after_2017After 2017 Policy Change", level = 0.95)
+
+# Print the confidence intervals
+print(conf_int_wind)
+```
+
+
+
+## Figuring Things Out
+
+
+
 ```{r}
 head(df)
 ```
@@ -45,6 +171,8 @@ regular_model <- linear_reg() %>%
   set_engine("lm") %>%
   fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size + voltage_level, data = df)
 
+saveRDS(mixed_model_solar, file = "mixed_model_solar.rds")
+
 tidy(regular_model)
 ```
 ```{r}
@@ -64,15 +192,15 @@ non-constant variance
 
 
 ```{r}
-df <- df %>%
-  mutate(
-    size = case_when(
-      electrical_capacity <= 1 ~ "small", 
-      electrical_capacity > 1 & electrical_capacity <= 4 ~ "medium", 
-      electrical_capacity > 4 ~ "big", 
-      TRUE ~ NA_character_
-    )
-  )
+#df <- df %>%
+  #mutate(
+    #size = case_when(
+      #electrical_capacity <= 1 ~ "small", 
+      #electrical_capacity > 1 & electrical_capacity <= 4 ~ "medium", 
+      #electrical_capacity > 4 ~ "big", 
+      #TRUE ~ NA_character_
+    #)
+  #)
 
 ```
 
@@ -83,9 +211,9 @@ df_sum_capacity <- df %>%
 ```
 
 ```{r}
-regular_model_state <- linear_reg() %>%
+regular_model<- linear_reg() %>%
   set_engine("lm") %>%
-  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state, data = df)
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size, data = df)
 ```
 
 ```{r}
@@ -127,4 +255,24 @@ regular_model_small <- linear_reg() %>%
 tidy(regular_model_small)
 ```
 
+```{r}
+regular_model_solar <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ after_2017 + federal_state + size, data = df_solar)
+```
+
+```{r}
+tidy(regular_model_solar)
+```
+
+
+```{r}
+regular_model_wind <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(electrical_capacity ~ after_2017 + federal_state + size, data = df_wind)
+```
+
+```{r}
+tidy(regular_model_wind)
+```
 
