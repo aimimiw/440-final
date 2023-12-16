@@ -4,4 +4,426 @@ format: pdf
 editor: visual
 ---
 
-## 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+# load in libraries
+package_list <- c("tidyverse", "vroom", "stringr", "dplyr", "ggsci", "gridExtra", "cowplot", "ggplot2", "ggmap", "sf", "tidymodels")
+
+# load in packages
+for (package_name in package_list) {
+  if (!requireNamespace(package_name, quietly = TRUE)) {
+    install.packages(package_name)
+  }
+  library(package_name, character.only = TRUE)
+}
+
+
+df = read.csv("cleaned_df_1.csv")
+```
+
+## Introduction
+
+What is the Energiewende? What happened? Why do we care about the 2017 Policy Change and what experts were worried about.What is electrical capacity and why use that as an indicator for energy transition?
+
+-   Energiewende is Germany's word for Energy Transition
+
+-   In 2017, they changed the system from tarriff based to auction based
+
+-   Experts are concerned that this would slow down energy transition
+
+Research Question: Was there any change in electrical capacity before and after the 2017 Policy Change?
+
+## Data Description
+
+Data is from blah and include the information on the latitude and longitude
+
+## Data Visualization
+```{r}
+df$commissioning_date <- ymd(df$commissioning_date)
+
+hist_power <- ggplot(df, aes(x = commissioning_date)) + 
+  geom_histogram(fill = "darkslategray2", binwidth = 30) + 
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 5500, label = "Policy Change", vjust = 1, hjust = 0) + 
+  labs(
+      title = "Distribution of Renewable Power", 
+      subtitle = "Commissioned 2016-2018", 
+      x = "Commissioning Date", 
+      y = "Count of Plants Commissioned"
+    ) + 
+  scale_x_date(date_labels = "%b %Y", date_breaks= "6 months") 
+ 
+hist_power   
+```
+
+
+```{r}
+sum_energy <- df %>%
+  group_by(commissioning_date, energy_source_level_2) %>%
+  summarise(total_capacity = sum(electrical_capacity))
+```
+
+```{r}
+cumsum_energy <- df %>%
+  group_by(energy_source_level_2) %>%
+  arrange(commissioning_date) %>%
+  mutate(cum_capacity = cumsum(electrical_capacity))
+```
+
+
+
+```{r}
+cumsum_energy$commissioning_date <- ymd(cumsum_energy$commissioning_date)
+
+total_capacity_type <- ggplot(cumsum_energy, 
+       aes(x = commissioning_date, y = cum_capacity, color = as.factor(energy_source_level_2))) +
+  geom_line() +
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 7500, label = "Policy Change", vjust = 1, hjust = 1) + 
+  labs(title = "Cumulative Capacity", 
+       subtitle = "From 1/1/2016 to 1/1/2018", 
+       color = "Renewable Energy Source", 
+       x = "Commissioning Date", 
+       y = "Cumulative Capacity (MWh)"
+       )
+
+
+total_capacity_type
+
+```
+```{r}
+sum_energy$commissioning_date <- ymd(sum_energy$commissioning_date)
+total_capacity <- ggplot(sum_energy, 
+       aes(x = commissioning_date, y = cumsum(total_capacity))) + 
+  geom_line() + 
+  geom_vline(xintercept = as.numeric(as.Date("2017-01-01")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 10000, label = "Policy Change", vjust = 1, hjust = 1) + 
+  labs(title = "Cumulative Capacity Overall", 
+       subtitle = "From 1/1/2016 to 1/1/2018", 
+       x = "Commissioning Date", 
+       y = "Cumulative Capacity (MWh)")
+
+total_capacity
+```
+
+
+```{r}
+library(rnaturalearth)
+library(rnaturalearthhires)
+library(maps)
+```
+
+```{r}
+germany_states <- ne_states(country = "Germany", returnclass = "sf")
+```
+
+```{r}
+df_sum_capacity <- df %>%
+  group_by(federal_state, after_2017) %>%
+  summarise(sum_cap = sum(electrical_capacity, na.rm = TRUE))
+```
+
+```{r}
+germany_state_data_sum <- left_join(germany_states, df_sum_capacity, by = c("name" = "federal_state"))
+```
+
+```{r}
+sum <- ggplot() + 
+  geom_sf(data = germany_state_data_sum, aes(fill = sum_cap)) + 
+  scale_fill_viridis_c() + 
+  labs(fill = "Total Capacity (MWh)") + theme_minimal() + 
+  labs(
+    title = "Total Capacity of Commissioned Renewable Energy Plants",
+    subtitle = "From 1/1/2016 to 1/1/2018"
+  ) + 
+  theme(
+    text = element_text(size = 6),
+      plot.title = element_text(size = 8)
+  )  + 
+  facet_wrap(~after_2017)
+
+
+#geom_sf(data = ocean_polygon, aes(fill = sum_cap), color = NA) + 
+sum
+```
+```{r}
+bbox <- c(left = 4, bottom = 47.27, right = 15.5, top = 56)
+germany_map <- get_stadiamap(bbox, zoom = 6, maptype = "stamen_toner_lite")
+```
+
+```{r}
+df_wind<- subset(df, energy_source_level_2 == "Wind")
+df_solar<- subset(df, energy_source_level_2 == "Solar")
+df_hydro<- subset(df, energy_source_level_2 == "Hydro")
+df_geo<- subset(df, energy_source_level_2 == "Geothermal")
+df_bio<- subset(df, energy_source_level_2 == "Bioenergy")
+```
+
+```{r}
+
+wind <- ggmap(germany_map) + 
+geom_point(data = df_wind, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), alpha = 0.15) +
+facet_wrap(~after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Wind Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+wind
+```
+
+
+```{r}
+df_solar_not_small <- df_solar %>%
+  filter(size != "small")
+
+df_solar_small <- df_solar %>%
+  filter(size == "small")
+#only want utility-sized solar farms
+```
+
+```{r}
+solar <- ggmap(germany_map) + 
+geom_point(data = df_solar, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), size = 0.5, alpha = 0.15) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Solar Power Plants", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+solar
+```
+
+```{r}
+solar_not_small <- ggmap(germany_map) + 
+geom_point(data = df_solar_not_small, 
+           aes(x = lon, y = lat, 
+               color = electrical_capacity), alpha = 0.15) +
+facet_wrap(~ after_2017) + 
+  scale_color_viridis_c(option = "plasma") + 
+  labs(title = "Commissioned Solar Power Plants with >1MWh Capacity", 
+       subtitle = "From 1/1/2016 to 1/1/2018",
+       color = "Electrical Capacity (MWh)", 
+       x = "Longitude", 
+       y = "Latitude")
+
+solar_not_small
+```
+
+
+
+## Methods
+
+Null Hypothesis: There is no difference in growth of electrical capacity before and after the enactment of the 2017 policy change. 
+
+Alternative Hypothesis: There is a difference. 
+
+$$
+\text{{electrical\_capacity}} = \beta_0 + \beta_1 \times \text{{energy\_source\_level\_2}} + 
+\beta_2 \times \text{{after\_2017}} + 
+\beta_3 \times \text{{federal\_state}} + 
+\beta_4 \times \text{{size}} + 
+\beta_5 \times \text{{voltage\_level}} + \varepsilon
+$$
+
+
+I created 3 models. One model that is represented above. I created 2 other models only for wind and solar, the 2 biggest renewable power sources in Germany. The only solar model has the variables of after_2017, federal_state, and size. My wind model had the same predictors. I found the 95% confidence interval for the coefficient on after_2017 in order to examine if the 2017 policy was associated with electrical capacity in Germany.
+
+
+## Results
+
+### Linear Model
+```{r}
+regular_model <- readRDS("regular_model.rds")
+```
+
+
+```{r}
+print("overall")
+tidy(regular_model, conf.int = TRUE, conf.level = 0.95, exponentiate = FALSE) %>%
+  select(term, estimate, conf.low, conf.high, p.value) %>%
+  filter(term == "after_2017After 2017 Policy Change")
+```
+
+```{r}
+regular_model_solar <- readRDS("regular_model_solar.rds")
+```
+
+```{r}
+print("solar")
+tidy(regular_model_solar, conf.int = TRUE, conf.level = 0.95, exponentiate = FALSE) %>%
+  select(term, estimate, conf.low, conf.high, p.value) %>%
+  filter(term == "after_2017After 2017 Policy Change")
+```
+```{r}
+regular_model_wind <- readRDS("regular_model_wind.rds")
+```
+
+```{r}
+print("wind")
+tidy(regular_model_wind, conf.int = TRUE, conf.level = 0.95, exponentiate = FALSE) %>%
+  select(term, estimate, conf.low, conf.high, p.value) %>%
+  filter(term == "after_2017After 2017 Policy Change")
+```
+Interestingly, although the 2017 policy change was associated with a higher estimate for wind, the 95% confidence interval and the p value reveals that we fail to reject the null hypothesis.The broad confidence interval but high estimate could be due to the fact that wind turbines typically produce more power than solar panels. So, a singular wind turbine can make a big difference. 
+
+Overall, holding all else constant, on average, we expect the electrical capacity to increase by 0.003 MWh after the the 2017 Policy Change. Similarly, holding all else constant, on average, we expect the electrical capacity from solar energy to increase by 0.003 MWh after the 2017 Policy Change. While the confidence interval and the p-value enables us to reject the null hypothesis for both of these models, 0.003 MWh is not significant in this context because *insert something about how one single home needs x MWh* and how from the visualizations, we can see that cumulative capacity is in the 1000s of MWh.
+
+In conclusion, while the 2017 Policy Change is not associated with an increase in wind capacity, it is associated with an increase in overall renewable energy capacity and also specifically in solar. 
+
+### Change Point Detection
+
+```{r}
+library(changepoint)
+library(data.table)
+```
+
+
+```{r}
+df_stripped <- df_solar %>%
+  select(commissioning_date, electrical_capacity)
+
+df_stripped$commissioning_date <- ymd(df_stripped$commissioning_date)
+```
+
+```{r}
+de.tr_overall <- c(0, diff(df_stripped$electrical_capacity))
+```
+
+```{r}
+plot(de.tr_overall)
+```
+
+```{r}
+indices <- cpts(cpt.mean(de.tr_overall, method = "PELT"))
+```
+
+
+```{r}
+change_point_dates <- df_stripped$commissioning_date[indices]
+
+unique(change_point_dates)
+```
+
+```{r}
+#cumsum_energy <- df %>%
+  #group_by(energy_source_level_2) %>%
+  #arrange(commissioning_date) %>%
+  #mutate(cum_capacity = cumsum(electrical_capacity))
+
+
+cumsum_all <- df %>%
+  group_by(commissioning_date) %>%
+  summarise(day_sum = sum(electrical_capacity)) %>%
+  arrange(commissioning_date) %>% 
+  mutate(total_capacity = cumsum(day_sum))
+```
+
+```{r}
+cumsum_stripped <- cumsum_all %>%
+  select(commissioning_date, total_capacity)
+
+cumsum_stripped$commissioning_date <- ymd(cumsum_stripped$commissioning_date)
+```
+
+```{r}
+de.tr_cumsum <- c(0, diff(cumsum_stripped$total_capacity))
+```
+
+```{r}
+plot(de.tr_cumsum)
+```
+```{r}
+indices_sum <- cpts(cpt.mean(de.tr_cumsum, method = "BinSeg", Q = 3))
+```
+
+```{r}
+change_point_dates <- cumsum_stripped$commissioning_date[indices_sum]
+
+print(change_point_dates)
+```
+```{r}
+which.max(de.tr_cumsum)
+```
+
+```{r}
+cumsum_stripped$commissioning_date[517]
+```
+```{r}
+sum_energy$commissioning_date <- ymd(sum_energy$commissioning_date)
+total_capacity <- ggplot(sum_energy, 
+       aes(x = commissioning_date, y = cumsum(total_capacity))) + 
+  geom_line() + 
+  geom_vline(xintercept = as.numeric(as.Date("2016-12-31")), color = "red") + 
+  annotate("text", x = as.Date("2017-01-01"), y = 10000, label = "Policy Change", vjust = 1, hjust = 1) + 
+  labs(title = "Cumulative Capacity Overall", 
+       subtitle = "From 1/1/2016 to 1/1/2018", 
+       x = "Commissioning Date", 
+       y = "Cumulative Capacity (MWh)")
+
+total_capacity
+```
+
+
+```{r}
+library(lubridate)
+library(segmented)
+```
+
+```{r}
+df$commissioning_date <- as.Date(df$commissioning_date, format = "%Y-%m-%d")
+
+df$months_since <- (year(df$commissioning_date) - 2016)*12 + month(df$commissioning_date)
+```
+
+
+```{r}
+cumsum_month <- df %>%
+  group_by(months_since) %>%
+  summarise(month_sum = sum(electrical_capacity)) %>%
+  arrange(months_since) %>% 
+  mutate(total_capacity = cumsum(month_sum))
+```
+
+```{r}
+my.lm <- lm(total_capacity ~ months_since, data = cumsum_month)
+```
+
+```{r ,include=FALSE}
+my.coef <- coef(my.lm)
+p <- ggplot(cumsum_month, aes(x = months_since, y = total_capacity)) + 
+  geom_line(color = "black") + 
+  geom_abline(intercept = my.coef[1],
+                     slope = my.coef[2], 
+              color = "blue",
+                     aes(colour = "Overall"), 
+              show.legend = TRUE) 
+
+p
+```
+
+```{r}
+
+initial_breakpoint <- 13
+my.seg <- segmented(my.lm, 
+                    seg.Z = ~ months_since, 
+                    psi = list(months_since = c(initial_breakpoint)), 
+                  control = seg.control(display = FALSE))
+
+summary(my.seg)
+```
+```{r}
+my.seg$psi
+```
+

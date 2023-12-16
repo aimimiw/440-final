@@ -192,7 +192,7 @@ hist_power <- ggplot(df, aes(x = commissioning_date)) +
       title = "Distribution of Renewable Power", 
       subtitle = "Commissioned 2016-2018", 
       x = "Commissioning Date", 
-      y = "Count"
+      y = "Count of Plants Commissioned"
     ) + 
   scale_x_date(date_labels = "%b %Y", date_breaks= "6 months") 
  
@@ -275,6 +275,10 @@ ggsave("total_capacity.png", plot = total_capacity)
 
 
 ### Renewables on Maps
+```{r}
+register_stadiamaps("909cd753-30f3-4edd-b91a-0582451bd74f", write = TRUE)
+```
+
 
 ```{r}
 bbox <- c(left = 4, bottom = 47.27, right = 15.5, top = 56)

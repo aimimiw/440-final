@@ -13,7 +13,7 @@ An overall linear model and then one just for solar and wind, along with their c
 ```{r}
 regular_model <- linear_reg() %>%
   set_engine("lm") %>%
-  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size + voltage_level, data = df)
+  fit(electrical_capacity ~ energy_source_level_2 + after_2017 + federal_state + size, data = df)
 
 saveRDS(regular_model, file = "regular_model.rds")
 ```
