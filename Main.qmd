@@ -41,6 +41,7 @@ Research Question: Was there any change in electrical capacity before and after 
 Data is from blah and include the information on the latitude and longitude
 
 ## Data Visualization
+
 ```{r}
 df$commissioning_date <- ymd(df$commissioning_date)
 
@@ -59,7 +60,6 @@ hist_power <- ggplot(df, aes(x = commissioning_date)) +
 hist_power   
 ```
 
-
 ```{r}
 sum_energy <- df %>%
   group_by(commissioning_date, energy_source_level_2) %>%
@@ -72,8 +72,6 @@ cumsum_energy <- df %>%
   arrange(commissioning_date) %>%
   mutate(cum_capacity = cumsum(electrical_capacity))
 ```
-
-
 
 ```{r}
 cumsum_energy$commissioning_date <- ymd(cumsum_energy$commissioning_date)
@@ -94,6 +92,7 @@ total_capacity_type <- ggplot(cumsum_energy,
 total_capacity_type
 
 ```
+
 ```{r}
 sum_energy$commissioning_date <- ymd(sum_energy$commissioning_date)
 total_capacity <- ggplot(sum_energy, 
@@ -108,7 +107,6 @@ total_capacity <- ggplot(sum_energy,
 
 total_capacity
 ```
-
 
 ```{r}
 library(rnaturalearth)
@@ -149,6 +147,7 @@ sum <- ggplot() +
 #geom_sf(data = ocean_polygon, aes(fill = sum_cap), color = NA) + 
 sum
 ```
+
 ```{r}
 bbox <- c(left = 4, bottom = 47.27, right = 15.5, top = 56)
 germany_map <- get_stadiamap(bbox, zoom = 6, maptype = "stamen_toner_lite")
@@ -178,7 +177,6 @@ facet_wrap(~after_2017) +
 
 wind
 ```
-
 
 ```{r}
 df_solar_not_small <- df_solar %>%
@@ -221,13 +219,11 @@ facet_wrap(~ after_2017) +
 solar_not_small
 ```
 
-
-
 ## Methods
 
-Null Hypothesis: There is no difference in growth of electrical capacity before and after the enactment of the 2017 policy change. 
+Null Hypothesis: There is no difference in growth of electrical capacity before and after the enactment of the 2017 policy change.
 
-Alternative Hypothesis: There is a difference. 
+Alternative Hypothesis: There is a difference.
 
 $$
 \text{{electrical\_capacity}} = \beta_0 + \beta_1 \times \text{{energy\_source\_level\_2}} + 
@@ -237,17 +233,15 @@ $$
 \beta_5 \times \text{{voltage\_level}} + \varepsilon
 $$
 
-
 I created 3 models. One model that is represented above. I created 2 other models only for wind and solar, the 2 biggest renewable power sources in Germany. The only solar model has the variables of after_2017, federal_state, and size. My wind model had the same predictors. I found the 95% confidence interval for the coefficient on after_2017 in order to examine if the 2017 policy was associated with electrical capacity in Germany.
-
 
 ## Results
 
 ### Linear Model
+
 ```{r}
 regular_model <- readRDS("regular_model.rds")
 ```
-
 
 ```{r}
 print("overall")
@@ -266,6 +260,7 @@ tidy(regular_model_solar, conf.int = TRUE, conf.level = 0.95, exponentiate = FAL
   select(term, estimate, conf.low, conf.high, p.value) %>%
   filter(term == "after_2017After 2017 Policy Change")
 ```
+
 ```{r}
 regular_model_wind <- readRDS("regular_model_wind.rds")
 ```
@@ -276,11 +271,12 @@ tidy(regular_model_wind, conf.int = TRUE, conf.level = 0.95, exponentiate = FALS
   select(term, estimate, conf.low, conf.high, p.value) %>%
   filter(term == "after_2017After 2017 Policy Change")
 ```
-Interestingly, although the 2017 policy change was associated with a higher estimate for wind, the 95% confidence interval and the p value reveals that we fail to reject the null hypothesis.The broad confidence interval but high estimate could be due to the fact that wind turbines typically produce more power than solar panels. So, a singular wind turbine can make a big difference. 
+
+Interestingly, although the 2017 policy change was associated with a higher estimate for wind, the 95% confidence interval and the p value reveals that we fail to reject the null hypothesis.The broad confidence interval but high estimate could be due to the fact that wind turbines typically produce more power than solar panels. So, a singular wind turbine can make a big difference.
 
 Overall, holding all else constant, on average, we expect the electrical capacity to increase by 0.003 MWh after the the 2017 Policy Change. Similarly, holding all else constant, on average, we expect the electrical capacity from solar energy to increase by 0.003 MWh after the 2017 Policy Change. While the confidence interval and the p-value enables us to reject the null hypothesis for both of these models, 0.003 MWh is not significant in this context because *insert something about how one single home needs x MWh* and how from the visualizations, we can see that cumulative capacity is in the 1000s of MWh.
 
-In conclusion, while the 2017 Policy Change is not associated with an increase in wind capacity, it is associated with an increase in overall renewable energy capacity and also specifically in solar. 
+In conclusion, while the 2017 Policy Change is not associated with an increase in wind capacity, it is associated with an increase in overall renewable energy capacity and also specifically in solar.
 
 ### Change Point Detection
 
@@ -288,7 +284,6 @@ In conclusion, while the 2017 Policy Change is not associated with an increase i
 library(changepoint)
 library(data.table)
 ```
-
 
 ```{r}
 df_stripped <- df_solar %>%
@@ -308,7 +303,6 @@ plot(de.tr_overall)
 ```{r}
 indices <- cpts(cpt.mean(de.tr_overall, method = "PELT"))
 ```
-
 
 ```{r}
 change_point_dates <- df_stripped$commissioning_date[indices]
@@ -344,6 +338,7 @@ de.tr_cumsum <- c(0, diff(cumsum_stripped$total_capacity))
 ```{r}
 plot(de.tr_cumsum)
 ```
+
 ```{r}
 indices_sum <- cpts(cpt.mean(de.tr_cumsum, method = "BinSeg", Q = 3))
 ```
@@ -353,6 +348,7 @@ change_point_dates <- cumsum_stripped$commissioning_date[indices_sum]
 
 print(change_point_dates)
 ```
+
 ```{r}
 which.max(de.tr_cumsum)
 ```
@@ -360,6 +356,7 @@ which.max(de.tr_cumsum)
 ```{r}
 cumsum_stripped$commissioning_date[517]
 ```
+
 ```{r}
 sum_energy$commissioning_date <- ymd(sum_energy$commissioning_date)
 total_capacity <- ggplot(sum_energy, 
@@ -375,7 +372,6 @@ total_capacity <- ggplot(sum_energy,
 total_capacity
 ```
 
-
 ```{r}
 library(lubridate)
 library(segmented)
@@ -387,22 +383,36 @@ df$commissioning_date <- as.Date(df$commissioning_date, format = "%Y-%m-%d")
 df$months_since <- (year(df$commissioning_date) - 2016)*12 + month(df$commissioning_date)
 ```
 
-
 ```{r}
 cumsum_month <- df %>%
+  filter(months_since != 25) %>%
+  group_by(months_since) %>%
+  summarise(month_sum = sum(electrical_capacity)) 
+```
+
+```{r}
+my.lm <- lm(month_sum ~ months_since, data = cumsum_month)
+```
+
+```{r}
+my.coef <- coef(my.lm)
+spikes <- ggplot(cumsum_month, aes(x = months_since, y = month_sum)) + 
+  geom_line(color = "black")
+```
+
+```{r}
+cumsum_month_again <- df %>%
+  filter(months_since != 25) %>%
   group_by(months_since) %>%
   summarise(month_sum = sum(electrical_capacity)) %>%
-  arrange(months_since) %>% 
+  arrange(months_since) %>%
   mutate(total_capacity = cumsum(month_sum))
 ```
 
-```{r}
-my.lm <- lm(total_capacity ~ months_since, data = cumsum_month)
-```
-
-```{r ,include=FALSE}
+```{r , include = FALSE}
+my.lm <- lm(total_capacity ~ months_since, data = cumsum_month_again)
 my.coef <- coef(my.lm)
-p <- ggplot(cumsum_month, aes(x = months_since, y = total_capacity)) + 
+p <- ggplot(cumsum_month_again, aes(x = months_since, y = total_capacity)) + 
   geom_line(color = "black") + 
   geom_abline(intercept = my.coef[1],
                      slope = my.coef[2], 
@@ -414,16 +424,31 @@ p
 ```
 
 ```{r}
-
-initial_breakpoint <- 13
+breakpoint <- c(12, 18)
 my.seg <- segmented(my.lm, 
                     seg.Z = ~ months_since, 
-                    psi = list(months_since = c(initial_breakpoint)), 
-                  control = seg.control(display = FALSE))
+                    psi = breakpoint)
 
 summary(my.seg)
 ```
+
 ```{r}
-my.seg$psi
+my.fitted <- fitted(my.seg)
+my.model <- data.frame(months_since = cumsum_month_again$months_since, total_capacity = my.fitted)
 ```
 
+```{r}
+p + geom_line(data = my.model, 
+              aes(x = months_since, y = total_capacity), colour = "firebrick1") + 
+  labs(title = "Comparing Segmented Regression Plot")
+```
+
+```{r}
+slope(my.seg)
+```
+
+| Slopes  | Estimate | St. Error | 95% CI (Lower, Upper) |
+|---------|----------|-----------|-----------------------|
+| Slope 1 | 523.11   | 29.06     | (462.06, 584.15)      |
+| Slope 2 | 728.18   | 133.15    | (448.44, 1007.9)      |
+| Slope 3 | 684.26   | 13.96     | (654,93, 713.58)      |
